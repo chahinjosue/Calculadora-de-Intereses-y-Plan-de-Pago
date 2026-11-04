@@ -102,7 +102,7 @@ tfoot td{font-weight:700;background:color-mix(in srgb,var(--accent) 30%,var(--su
   <section class="panel" id="p-int" role="tabpanel" aria-labelledby="tab-int">
     <div class="card grid">
       <label class="full">Nombre del deudor <input id="i-nombre" type="text" autocomplete="off" enterkeyhint="done"></label>
-      <label class="full">Monto (HNL) <input id="i-monto" type="text" inputmode="decimal" enterkeyhint="done" value="100,000.00"></label>
+      <label class="full">Capital (HNL) <input id="i-monto" type="text" inputmode="decimal" enterkeyhint="done" value="100,000.00"></label>
       <label>Tasa de interés anual (%) <input id="i-tasa" type="text" inputmode="decimal" enterkeyhint="done" value="14"></label>
       <label>Base <input type="text" value="365 días" disabled></label>
       <label>Fecha inicial <input id="i-desde" type="date"></label>
@@ -113,9 +113,9 @@ tfoot td{font-weight:700;background:color-mix(in srgb,var(--accent) 30%,var(--su
       <div class="stats">
         <div class="stat"><span>Días</span><b id="r-dias">0</b></div>
         <div class="stat"><span>Interés por día</span><b id="r-diario">HNL 0.00</b></div>
-        <div class="stat"><span>Monto + intereses</span><b id="r-totint">HNL 0.00</b></div>
+        <div class="stat"><span>Capital + intereses</span><b id="r-totint">HNL 0.00</b></div>
       </div>
-      <p class="formula">Monto × tasa anual ÷ 365 × días transcurridos</p>
+      <p class="formula">Capital × tasa anual ÷ 365 × días transcurridos</p>
     </div>
     <p class="err" id="e-int" hidden></p>
     <button class="btn" id="pdf-int">Imprimir PDF</button>
@@ -127,7 +127,7 @@ tfoot td{font-weight:700;background:color-mix(in srgb,var(--accent) 30%,var(--su
   <section class="panel" id="p-amo" role="tabpanel" aria-labelledby="tab-amo" hidden>
     <div class="card grid">
       <label class="full">Nombre del deudor <input id="a-nombre" type="text" autocomplete="off" enterkeyhint="done"></label>
-      <label class="full">Monto del préstamo (HNL) <input id="a-monto" type="text" inputmode="decimal" enterkeyhint="done" value="100,000.00"></label>
+      <label class="full">Capital del préstamo (HNL) <input id="a-monto" type="text" inputmode="decimal" enterkeyhint="done" value="100,000.00"></label>
       <label>Tasa de interés anual (%) <input id="a-tasa" type="text" inputmode="decimal" enterkeyhint="done" value="14"></label>
       <label>Plazo (meses) <input id="a-plazo" type="number" inputmode="numeric" enterkeyhint="done" min="1" max="360" value="12"></label>
       <label class="full">Fecha de inicio <span class="hint">La primera cuota vence un mes después.</span><input id="a-inicio" type="date"></label>
@@ -297,20 +297,25 @@ tfoot td{font-weight:700;background:color-mix(in srgb,var(--accent) 30%,var(--su
   ["a-monto","a-tasa","a-plazo","a-inicio","a-nombre"].forEach(id => $(id).addEventListener("input", calcAmo));
 
   // ---------- PDF ----------
+  const ACREEDOR = "Enrique Lanza";
+  const FIRMA = "RED CONSULT HONDURAS";
   const NAVY=[31,42,68], YEL=[255,199,44], GRAY=[91,100,122], ROW=[244,245,248];
-  function pdfHeader(doc, title, nombre){
+  const blank = "______________________________";
+  function refCode(seed){
+    let h = 0; for(const ch of seed){ h = (h*31 + ch.charCodeAt(0)) >>> 0; }
+    const t = new Date();
+    return "RCH-" + t.getFullYear() + String(t.getMonth()+1).padStart(2,"0") + String(t.getDate()).padStart(2,"0") + "-" + (h % 46656).toString(36).toUpperCase().padStart(3,"0");
+  }
+  function pdfHeader(doc, title, ref){
     const W = doc.internal.pageSize.getWidth();
     doc.setFillColor(...NAVY); doc.rect(0,0,W,70,"F");
     doc.setFillColor(...YEL); doc.rect(0,70,W,4,"F");
     doc.setTextColor(255,255,255); doc.setFont("helvetica","bold"); doc.setFontSize(18);
     doc.text(title, 40, 42);
     doc.setFont("helvetica","normal"); doc.setFontSize(9);
-    doc.text("Emitido: " + fmtD(new Date()), W-40, 42, {align:"right"});
-    doc.setTextColor(...NAVY); doc.setFontSize(10); doc.setFont("helvetica","bold");
-    doc.text("Deudor:", 40, 100);
-    doc.setFont("helvetica","normal"); doc.setFontSize(12);
-    doc.text(nombre || "__________________________________", 90, 100);
-    return 120;
+    doc.text("Emitido: " + fmtD(new Date()), W-40, 34, {align:"right"});
+    doc.text("Ref.: " + ref, W-40, 48, {align:"right"});
+    return 104;
   }
   function kv(doc, x, y, pairs, colW){
     pairs.forEach((p,idx) => {
@@ -320,13 +325,50 @@ tfoot td{font-weight:700;background:color-mix(in srgb,var(--accent) 30%,var(--su
     });
     return y + Math.ceil(pairs.length/2)*34;
   }
+  function partes(nombre){ return [["Deudor", nombre || blank], ["Acreedor", ACREEDOR]]; }
   function footer(doc, note){
     const W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight(), n = doc.getNumberOfPages();
     for(let i=1;i<=n;i++){
-      doc.setPage(i); doc.setFont("helvetica","normal"); doc.setFontSize(8); doc.setTextColor(...GRAY);
-      doc.text(note, 40, H-24);
-      doc.text("Página " + i + " de " + n, W-40, H-24, {align:"right"});
+      doc.setPage(i); doc.setFont("helvetica","normal"); doc.setFontSize(7.5); doc.setTextColor(...GRAY);
+      doc.text(note, 40, H-22);
+      doc.text("Página " + i + " de " + n, W-40, H-22, {align:"right"});
     }
+  }
+  // Authorship block at the foot of the last page
+  const AUTH_H = 104;
+  function authorBlock(doc, ref){
+    const W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight();
+    const top = H - 40 - AUTH_H;
+    doc.setDrawColor(...NAVY); doc.setLineWidth(1.2); doc.line(40, top, W-40, top);
+    doc.setLineWidth(.4); doc.line(40, top+3, W-40, top+3);
+    // emblem
+    const cx = 66, cy = top + 46;
+    doc.setFillColor(...NAVY); doc.circle(cx, cy, 22, "F");
+    doc.setDrawColor(...YEL); doc.setLineWidth(1.6); doc.circle(cx, cy, 18, "S");
+    doc.setFont("times","bold"); doc.setFontSize(14); doc.setTextColor(255,255,255);
+    doc.text("RC", cx, cy+5, {align:"center"});
+    // firm
+    const tx = 100;
+    doc.setFont("helvetica","normal"); doc.setFontSize(7); doc.setTextColor(...GRAY);
+    doc.text("CÁLCULOS ELABORADOS Y VALIDADOS POR", tx, top+26, {charSpace:1.2});
+    doc.setFont("times","bold"); doc.setFontSize(15); doc.setTextColor(...NAVY);
+    doc.text(FIRMA, tx, top+45, {charSpace:1.6});
+    doc.setFont("times","italic"); doc.setFontSize(10); doc.setTextColor(...GRAY);
+    doc.text("Consultoría Financiera y Legal", tx, top+60);
+    doc.setFont("helvetica","normal"); doc.setFontSize(7.5);
+    doc.text("Referencia del cálculo: " + ref, tx, top+74);
+    // authorized signature
+    const sx1 = W-210, sx2 = W-40;
+    doc.setDrawColor(...GRAY); doc.setLineWidth(.6); doc.line(sx1, top+56, sx2, top+56);
+    doc.setFont("helvetica","bold"); doc.setFontSize(8.5); doc.setTextColor(...NAVY);
+    doc.text("Firma y sello autorizado", (sx1+sx2)/2, top+70, {align:"center"});
+    doc.setFont("helvetica","normal"); doc.setFontSize(7.5); doc.setTextColor(...GRAY);
+    doc.text(FIRMA, (sx1+sx2)/2, top+82, {align:"center"});
+  }
+  function ensureRoom(doc, y, need){
+    const H = doc.internal.pageSize.getHeight();
+    if(y + need > H - 40 - AUTH_H - 16){ doc.addPage(); return 60; }
+    return y;
   }
   function slug(s){ return (s||"").normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^A-Za-z0-9]+/g,"_").replace(/^_|_$/g,""); }
 
@@ -334,22 +376,24 @@ tfoot td{font-weight:700;background:color-mix(in srgb,var(--accent) 30%,var(--su
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF({unit:"pt", format:"letter"});
     const W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight();
-    let y = pdfHeader(doc, "Plan de pagos", d.nombre);
-    y = kv(doc, 40, y+8, [
-      ["Monto del préstamo", L(d.P)], ["Tasa de interés anual", (d.tasa*100).toFixed(2)+"%"],
+    const ref = refCode([d.nombre,d.P,d.tasa,d.n,d.modo,iso(d.ini)].join("|"));
+    let y = pdfHeader(doc, "Plan de pagos", ref);
+    y = kv(doc, 40, y, [
+      ...partes(d.nombre),
+      ["Capital del préstamo", L(d.P)], ["Tasa de interés anual", (d.tasa*100).toFixed(2)+"%"],
       ["Plazo", d.n + (d.n===1?" mes":" meses")], ["Modalidad", d.modo==="niv"?"Cuota nivelada":"Saldos insolutos"],
       ["Fecha de inicio", fmtD(d.ini)], ["Último pago", fmtD(d.rows[d.rows.length-1].fecha)],
     ], (W-80)/2);
     // summary band
-    y += 6;
+    y += 2;
     doc.setFillColor(...ROW); doc.roundedRect(40, y, W-80, 46, 6, 6, "F");
     const sum = [[d.modo==="niv"?"Cuota mensual":"Primera cuota", L(d.rows[0].cuota)],["Total intereses", L(d.tInt)],["Total a pagar", L(d.tCuo)]];
     sum.forEach((s,i)=>{ const cx = 52 + i*((W-104)/3);
       doc.setFont("helvetica","normal"); doc.setFontSize(8.5); doc.setTextColor(...GRAY); doc.text(s[0], cx, y+17);
       doc.setFont("helvetica","bold"); doc.setFontSize(12); doc.setTextColor(...NAVY); doc.text(s[1], cx, y+34); });
-    y += 66;
+    y += 62;
     // table
-    const cols = [{h:"No.",w:34,a:"center"},{h:"Fecha de pago",w:84,a:"left"},{h:"Saldo inicial",w:100},{h:"Intereses",w:90},{h:"Capital",w:100},{h:"Cuota a pagar",w:104,b:true}];
+    const cols = [{h:"No.",w:34,a:"center"},{h:"Fecha de pago",w:84,a:"left"},{h:"Saldo inicial",w:100},{h:"Intereses",w:90},{h:"Abono a capital",w:100},{h:"Cuota a pagar",w:104,b:true}];
     const tw = cols.reduce((s,c)=>s+c.w,0), x0 = (W-tw)/2, rh = 17;
     function head(){
       doc.setFillColor(...NAVY); doc.rect(x0, y, tw, 20, "F");
@@ -360,7 +404,7 @@ tfoot td{font-weight:700;background:color-mix(in srgb,var(--accent) 30%,var(--su
     }
     function rowOut(vals, fill, bold){
       if(fill){ doc.setFillColor(...fill); doc.rect(x0, y, tw, rh, "F"); }
-      doc.setFont("helvetica", bold?"bold":"normal"); doc.setFontSize(8.5); doc.setTextColor(...NAVY);
+      doc.setTextColor(...NAVY);
       let x = x0; cols.forEach((c,i)=>{ const v = vals[i]; if(v!==""){ const tx = c.a==="center"? x+c.w/2 : c.a==="left"? x+5 : x+c.w-5;
         doc.setFont("helvetica", (bold||c.b)?"bold":"normal"); doc.setFontSize(c.b?9.5:8.5);
         doc.text(String(v), tx, y+12, {align: c.a||"right"}); } x+=c.w; });
@@ -368,20 +412,23 @@ tfoot td{font-weight:700;background:color-mix(in srgb,var(--accent) 30%,var(--su
     }
     head();
     d.rows.forEach((r,idx)=>{
-      if(y + rh > H-50){ doc.addPage(); y = 40; head(); }
+      if(y + rh > H-50){ doc.addPage(); y = 50; head(); }
       rowOut([r.k, fmtD(r.fecha), nf.format(r.ini), nf.format(r.int), nf.format(r.cap), nf.format(r.cuota)], idx%2?ROW:null, false);
     });
-    if(y + rh + 4 > H-50){ doc.addPage(); y = 40; }
+    if(y + rh + 4 > H-50){ doc.addPage(); y = 50; }
     doc.setDrawColor(...YEL); doc.setLineWidth(1.5); doc.line(x0, y, x0+tw, y);
     rowOut(["", "Totales", "", nf.format(d.tInt), nf.format(d.tCap), nf.format(d.tCuo)], [255,240,196], true);
-    // signatures
-    y += 50;
-    if(y + 40 > H-50){ doc.addPage(); y = 90; }
-    doc.setDrawColor(...GRAY); doc.setLineWidth(.6);
-    doc.line(60, y, 260, y); doc.line(W-260, y, W-60, y);
-    doc.setFont("helvetica","normal"); doc.setFontSize(9); doc.setTextColor(...GRAY);
-    doc.text("Firma del deudor", 160, y+14, {align:"center"}); doc.text("Firma del acreedor", W-160, y+14, {align:"center"});
-    footer(doc, "Cálculo referencial. Interés mensual = saldo × tasa anual ÷ 12.");
+    // signatures of the parties
+    y = ensureRoom(doc, y + 46, 40);
+    const sig = [[60, 260, d.nombre || " ", "Deudor"], [W-260, W-60, ACREEDOR, "Acreedor"]];
+    sig.forEach(([x1,x2,name,role])=>{
+      const mx = (x1+x2)/2;
+      doc.setDrawColor(...GRAY); doc.setLineWidth(.6); doc.line(x1, y, x2, y);
+      doc.setFont("helvetica","bold"); doc.setFontSize(9.5); doc.setTextColor(...NAVY); doc.text(name, mx, y+14, {align:"center"});
+      doc.setFont("helvetica","normal"); doc.setFontSize(8.5); doc.setTextColor(...GRAY); doc.text(role, mx, y+26, {align:"center"});
+    });
+    authorBlock(doc, ref);
+    footer(doc, "Documento de carácter referencial. Interés mensual = saldo × tasa anual ÷ 12.");
     return doc.output("blob");
   }
 
@@ -389,24 +436,27 @@ tfoot td{font-weight:700;background:color-mix(in srgb,var(--accent) 30%,var(--su
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF({unit:"pt", format:"letter"});
     const W = doc.internal.pageSize.getWidth();
-    let y = pdfHeader(doc, "Cálculo de intereses", d.nombre);
-    y = kv(doc, 40, y+8, [
-      ["Monto", L(d.monto)], ["Tasa de interés anual", (d.tasa*100).toFixed(2)+"%"],
+    const ref = refCode([d.nombre,d.monto,d.tasa,iso(d.d1),iso(d.d2)].join("|"));
+    let y = pdfHeader(doc, "Cálculo de intereses", ref);
+    y = kv(doc, 40, y, [
+      ...partes(d.nombre),
+      ["Capital", L(d.monto)], ["Tasa de interés anual", (d.tasa*100).toFixed(2)+"%"],
       ["Fecha inicial", fmtD(d.d1)], ["Fecha final", fmtD(d.d2)],
       ["Días transcurridos", String(d.dias)], ["Base", "365 días"],
     ], (W-80)/2);
-    y += 10;
+    y += 6;
     doc.setFillColor(...NAVY); doc.roundedRect(40, y, W-80, 92, 8, 8, "F");
     doc.setFont("helvetica","normal"); doc.setFontSize(9); doc.setTextColor(201,208,224);
     doc.text("Total de intereses", 58, y+24);
     doc.setFont("helvetica","bold"); doc.setFontSize(24); doc.setTextColor(...YEL);
     doc.text(L(d.interes), 58, y+54);
     doc.setFont("helvetica","normal"); doc.setFontSize(9); doc.setTextColor(255,255,255);
-    doc.text("Interés por día: " + L(d.diario) + "     Monto + intereses: " + L(d.monto + d.interes), 58, y+78);
+    doc.text("Interés por día: " + L(d.diario) + "     Capital + intereses: " + L(d.monto + d.interes), 58, y+78);
     y += 116;
     doc.setFontSize(9); doc.setTextColor(...GRAY);
     doc.text("Fórmula: " + L(d.monto) + " × " + (d.tasa*100).toFixed(2) + "% ÷ 365 × " + d.dias + " días", 40, y);
-    footer(doc, "Cálculo referencial. Interés simple, base 365 días.");
+    authorBlock(doc, ref);
+    footer(doc, "Documento de carácter referencial. Interés simple, base 365 días.");
     return doc.output("blob");
   }
 
