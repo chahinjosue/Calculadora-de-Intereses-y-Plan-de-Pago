@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Calculadora de Intereses y Plan de Pagos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Sans+Condensed:wght@600;700&display=swap" rel="stylesheet">
+<style>
+/* Layout: una columna centrada para teléfono; pestañas arriba, formulario, resultado, tabla. */
+:root{
+  --bg:#F4F5F8; --surface:#FFFFFF; --ink:#18213A; --muted:#5B647A; --line:#DCE0E8;
+  --navy:#1F2A44; --accent:#FFC72C; --accent-ink:#1F2A44; --field:#FFFBEA; --ok:#1E7A4C;
+  --font-body:"IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-display:"IBM Plex Sans Condensed","IBM Plex Sans", system-ui, sans-serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0F1422; --surface:#182033; --ink:#E8ECF4; --muted:#A3ACC0; --line:#2B3550;
+    --navy:#2A3758; --accent:#FFC72C; --accent-ink:#141A2B; --field:#1F2840; --ok:#5CC98F;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0F1422; --surface:#182033; --ink:#E8ECF4; --muted:#A3ACC0; --line:#2B3550;
+  --navy:#2A3758; --accent:#FFC72C; --accent-ink:#141A2B; --field:#1F2840; --ok:#5CC98F;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:16px;line-height:1.45}
+header{background:var(--navy);color:#fff;padding:20px 16px 0}
+.wrap{max-width:760px;margin:0 auto}
+header h1{font-family:var(--font-display);font-size:1.45rem;margin:0 0 4px;text-wrap:balance;letter-spacing:.01em}
+header p{margin:0 0 16px;color:#C9D0E0;font-size:.9rem}
+.tabs{display:flex;gap:4px}
+.tab{flex:1;appearance:none;border:0;background:transparent;color:#C9D0E0;font:600 .95rem var(--font-body);
+  padding:12px 8px;border-radius:10px 10px 0 0;cursor:pointer}
+.tab[aria-selected="true"]{background:var(--bg);color:var(--ink);box-shadow:inset 0 3px 0 var(--accent)}
+.tab:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+main{padding:16px}
+.panel{display:flex;flex-direction:column;gap:16px}
+.panel[hidden]{display:none}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px 14px}
+.grid .full{grid-column:1 / -1}
+@media (max-width:480px){.grid{grid-template-columns:1fr}}
+label{display:flex;flex-direction:column;gap:6px;font-size:.85rem;font-weight:600;color:var(--muted)}
+input,select{font:500 1.05rem var(--font-body);color:var(--ink);background:var(--field);border:1px solid var(--line);
+  border-radius:10px;padding:12px;min-height:48px;width:100%}
+.hint{font-weight:400;font-size:.78rem;color:var(--muted)}
+.seg{display:flex;gap:6px;background:var(--field);border:1px solid var(--line);border-radius:12px;padding:4px}
+.seg button{flex:1;appearance:none;border:0;background:transparent;color:var(--ink);font:600 .92rem var(--font-body);
+  padding:10px 6px;border-radius:9px;cursor:pointer;min-height:44px}
+.seg button[aria-pressed="true"]{background:var(--navy);color:#fff}
+.result{background:var(--navy);color:#fff;border-radius:14px;padding:18px 16px;display:flex;flex-direction:column;gap:12px}
+.big{display:flex;flex-direction:column;gap:2px}
+.big span{font-size:.82rem;color:#C9D0E0;font-weight:500}
+.big strong{font-family:var(--font-display);font-size:2rem;line-height:1.1;color:var(--accent);font-variant-numeric:tabular-nums}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+@media (max-width:480px){.stats{grid-template-columns:1fr 1fr}}
+.stat span{display:block;font-size:.75rem;color:#C9D0E0}
+.stat b{font-size:1rem;font-variant-numeric:tabular-nums}
+.formula{font-size:.8rem;color:#C9D0E0;margin:0}
+.btn{appearance:none;border:0;background:var(--accent);color:var(--accent-ink);font:700 1rem var(--font-body);
+  padding:14px 16px;border-radius:12px;cursor:pointer;min-height:50px;width:100%}
+.btn.alt{background:transparent;color:var(--ink);border:2px solid var(--navy)}
+.btn:active{transform:translateY(1px)}
+.btn[disabled]{opacity:.55;cursor:not-allowed}
+.status{font-size:.85rem;min-height:1.2em;margin:0;color:var(--muted)}
+.status.ok{color:var(--ok)}
+.tablebox{overflow-x:auto;border:1px solid var(--line);border-radius:14px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;min-width:540px;font-size:.88rem;font-variant-numeric:tabular-nums}
+th{background:var(--navy);color:#fff;font-weight:600;padding:10px 8px;text-align:right;white-space:nowrap;position:sticky;top:0}
+th:first-child,td:first-child{text-align:center}
+th:nth-child(2),td:nth-child(2){text-align:left}
+td{padding:9px 8px;border-top:1px solid var(--line);text-align:right;white-space:nowrap}
+tbody tr:nth-child(even) td{background:color-mix(in srgb,var(--line) 35%,transparent)}
+td.cuota{font-weight:700;color:var(--ink);font-size:.95rem}
+tfoot td{font-weight:700;background:color-mix(in srgb,var(--accent) 30%,var(--surface));border-top:2px solid var(--accent)}
+.note{font-size:.8rem;color:var(--muted);margin:0}
+.err{color:#C0392B;font-size:.85rem;margin:0}
+@media (prefers-reduced-motion: reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <h1>Calculadora de Intereses y Plan de Pagos</h1>
+    <p>Para préstamos entre personas. Montos en Lempiras (HNL).</p>
+    <div class="tabs" role="tablist">
+      <button class="tab" role="tab" id="tab-int" aria-controls="p-int" aria-selected="true">Intereses entre fechas</button>
+      <button class="tab" role="tab" id="tab-amo" aria-controls="p-amo" aria-selected="false">Plan de pagos</button>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <!-- ===== Intereses entre fechas ===== -->
+  <section class="panel" id="p-int" role="tabpanel" aria-labelledby="tab-int">
+    <div class="card grid">
+      <label class="full">Nombre del deudor <input id="i-nombre" type="text" autocomplete="off" enterkeyhint="done"></label>
+      <label class="full">Monto (HNL) <input id="i-monto" type="text" inputmode="decimal" enterkeyhint="done" value="100,000.00"></label>
+      <label>Tasa de interés anual (%) <input id="i-tasa" type="text" inputmode="decimal" enterkeyhint="done" value="14"></label>
+      <label>Base <input type="text" value="365 días" disabled></label>
+      <label>Fecha inicial <input id="i-desde" type="date"></label>
+      <label>Fecha final <input id="i-hasta" type="date"></label>
+    </div>
+    <div class="result" aria-live="polite">
+      <div class="big"><span>Total de intereses</span><strong id="r-int">HNL 0.00</strong></div>
+      <div class="stats">
+        <div class="stat"><span>Días</span><b id="r-dias">0</b></div>
+        <div class="stat"><span>Interés por día</span><b id="r-diario">HNL 0.00</b></div>
+        <div class="stat"><span>Monto + intereses</span><b id="r-totint">HNL 0.00</b></div>
+      </div>
+      <p class="formula">Monto × tasa anual ÷ 365 × días transcurridos</p>
+    </div>
+    <p class="err" id="e-int" hidden></p>
+    <button class="btn" id="pdf-int">Imprimir PDF</button>
+    <button class="btn alt" id="sh-int" hidden>Enviar PDF (WhatsApp, correo…)</button>
+    <p class="status" id="s-int"></p>
+  </section>
+
+  <!-- ===== Plan de pagos ===== -->
+  <section class="panel" id="p-amo" role="tabpanel" aria-labelledby="tab-amo" hidden>
+    <div class="card grid">
+      <label class="full">Nombre del deudor <input id="a-nombre" type="text" autocomplete="off" enterkeyhint="done"></label>
+      <label class="full">Monto del préstamo (HNL) <input id="a-monto" type="text" inputmode="decimal" enterkeyhint="done" value="100,000.00"></label>
+      <label>Tasa de interés anual (%) <input id="a-tasa" type="text" inputmode="decimal" enterkeyhint="done" value="14"></label>
+      <label>Plazo (meses) <input id="a-plazo" type="number" inputmode="numeric" enterkeyhint="done" min="1" max="360" value="12"></label>
+      <label class="full">Fecha de inicio <span class="hint">La primera cuota vence un mes después.</span><input id="a-inicio" type="date"></label>
+      <div class="full" style="display:flex;flex-direction:column;gap:6px">
+        <span style="font-size:.85rem;font-weight:600;color:var(--muted)" id="mod-lbl">Modalidad</span>
+        <div class="seg" role="group" aria-labelledby="mod-lbl">
+          <button type="button" id="m-niv" aria-pressed="true">Cuota nivelada</button>
+          <button type="button" id="m-ins" aria-pressed="false">Saldos insolutos</button>
+        </div>
+        <span class="hint" id="mod-hint">La misma cuota todos los meses.</span>
+      </div>
+    </div>
+    <div class="result" aria-live="polite">
+      <div class="big"><span id="r-cuota-lbl">Cuota mensual</span><strong id="r-cuota">HNL 0.00</strong></div>
+      <div class="stats">
+        <div class="stat"><span>Total intereses</span><b id="r-tint">HNL 0.00</b></div>
+        <div class="stat"><span>Total a pagar</span><b id="r-tpag">HNL 0.00</b></div>
+        <div class="stat"><span>Última cuota</span><b id="r-ult">—</b></div>
+      </div>
+    </div>
+    <p class="err" id="e-amo" hidden></p>
+    <button class="btn" id="pdf-amo">Imprimir PDF</button>
+    <button class="btn alt" id="sh-amo" hidden>Enviar PDF (WhatsApp, correo…)</button>
+    <p class="status" id="s-amo"></p>
+    <div class="tablebox">
+      <table>
+        <thead><tr><th>No.</th><th>Fecha</th><th>Cuota a pagar</th><th>Saldo inicial</th><th>Intereses</th><th>Capital</th></tr></thead>
+        <tbody id="t-body"></tbody>
+        <tfoot><tr><td colspan="2" style="text-align:left">Totales</td><td id="f-cuo"></td><td></td><td id="f-int"></td><td id="f-cap"></td></tr></tfoot>
+      </table>
+    </div>
+    <p class="note">Interés mensual = saldo × tasa anual ÷ 12. Cálculo referencial; el acuerdo debe constar por escrito.</p>
+  </section>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script>
+(function(){
+  const $ = id => document.getElementById(id);
+  const nf = new Intl.NumberFormat("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
+  const L = v => "HNL " + nf.format(v);
+  const r2 = v => Math.round((v + Number.EPSILON) * 100) / 100;
+  const num = s => { const v = parseFloat(String(s).replace(/[^0-9.\-]/g,"")); return isFinite(v) ? v : NaN; };
+  const iso = d => d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+  const parseISO = s => { if(!s) return null; const [y,m,d] = s.split("-").map(Number); return new Date(y,m-1,d); };
+  const fmtD = d => String(d.getDate()).padStart(2,"0")+"/"+String(d.getMonth()+1).padStart(2,"0")+"/"+d.getFullYear();
+  const addMonths = (d,n) => { const y=d.getFullYear(), m=d.getMonth()+n; const last=new Date(y,m+1,0).getDate(); return new Date(y,m,Math.min(d.getDate(),last)); };
+  const dayDiff = (a,b) => Math.round((Date.UTC(b.getFullYear(),b.getMonth(),b.getDate()) - Date.UTC(a.getFullYear(),a.getMonth(),a.getDate()))/86400000);
+
+  // ---------- defaults ----------
+  const today = new Date(); today.setHours(0,0,0,0);
+  $("i-desde").value = iso(addMonths(today,-2));
+  $("i-hasta").value = iso(today);
+  $("a-inicio").value = iso(today);
+
+  // ---------- tabs ----------
+  function showTab(which){
+    const isInt = which === "int";
+    $("tab-int").setAttribute("aria-selected", isInt);
+    $("tab-amo").setAttribute("aria-selected", !isInt);
+    $("p-int").hidden = !isInt; $("p-amo").hidden = isInt;
+  }
+  $("tab-int").onclick = () => showTab("int");
+  $("tab-amo").onclick = () => showTab("amo");
+
+  // money fields: commas while typing, two decimals on leaving the field
+  function liveMoney(el){
+    const raw = el.value, caret = el.selectionStart ?? raw.length;
+    const before = raw.slice(0, caret).replace(/[^0-9.]/g,"");
+    let clean = raw.replace(/[^0-9.]/g,"");
+    const dot = clean.indexOf(".");
+    if(dot >= 0) clean = clean.slice(0,dot+1) + clean.slice(dot+1).replace(/\./g,"").slice(0,2);
+    let [ent, dec] = clean.split(".");
+    ent = (ent || "").replace(/^0+(?=\d)/,"");
+    const fmt = ent.replace(/\B(?=(\d{3})+(?!\d))/g, ",") + (dec !== undefined ? "." + dec : "");
+    el.value = fmt;
+    // put the caret back after the same number of digits/dot
+    let n = Math.min(before.length, clean.length), pos = 0;
+    while(pos < fmt.length && n > 0){ if(fmt[pos] !== ",") n--; pos++; }
+    try{ el.setSelectionRange(pos, pos); }catch(_){}
+  }
+  ["i-monto","a-monto"].forEach(id => {
+    $(id).addEventListener("input", e => liveMoney(e.target));
+    $(id).addEventListener("blur", e => { const v = num(e.target.value); if(isFinite(v) && e.target.value !== "") e.target.value = nf.format(v); });
+  });
+
+  // phone keyboard: Enter closes it, and so does tapping outside a field
+  document.addEventListener("keydown", e => {
+    const t = e.target;
+    if(e.key === "Enter" && t && t.tagName === "INPUT"){ e.preventDefault(); t.blur(); }
+  });
+  document.addEventListener("pointerdown", e => {
+    const a = document.activeElement;
+    if(a && a.tagName === "INPUT" && !e.target.closest("input, select, label")) a.blur();
+  });
+
+  // ---------- interest between dates ----------
+  function calcInt(){
+    const monto = num($("i-monto").value), tasa = num($("i-tasa").value)/100;
+    const d1 = parseISO($("i-desde").value), d2 = parseISO($("i-hasta").value);
+    let msg = "";
+    if(!(monto > 0)) msg = "Escriba un monto mayor que cero.";
+    else if(!(tasa >= 0)) msg = "Escriba la tasa anual, por ejemplo 14.";
+    else if(!d1 || !d2) msg = "Elija las dos fechas.";
+    else if(d2 < d1) msg = "La fecha final debe ser igual o posterior a la fecha inicial.";
+    $("e-int").hidden = !msg; $("e-int").textContent = msg;
+    if(msg){ $("pdf-int").disabled = true; return null; }
+    const dias = dayDiff(d1,d2), diario = monto*tasa/365, interes = diario*dias;
+    $("r-int").textContent = L(interes); $("r-dias").textContent = dias;
+    $("r-diario").textContent = L(diario); $("r-totint").textContent = L(monto+interes);
+    $("pdf-int").disabled = false;
+    return {nombre:$("i-nombre").value.trim(), monto, tasa, d1, d2, dias, diario, interes};
+  }
+  ["i-monto","i-tasa","i-desde","i-hasta","i-nombre"].forEach(id => $(id).addEventListener("input", calcInt));
+
+  // ---------- amortization ----------
+  let modo = "niv";
+  function setModo(m){
+    modo = m;
+    $("m-niv").setAttribute("aria-pressed", m==="niv");
+    $("m-ins").setAttribute("aria-pressed", m==="ins");
+    $("mod-hint").textContent = m==="niv" ? "La misma cuota todos los meses."
+      : "Abono fijo a capital; el interés se calcula sobre el saldo pendiente, así que la cuota baja cada mes.";
+    calcAmo();
+  }
+  $("m-niv").onclick = () => setModo("niv");
+  $("m-ins").onclick = () => setModo("ins");
+
+  function schedule(P, tasaAnual, n, inicio, m){
+    const i = tasaAnual/12;
+    const pmt = i === 0 ? P/n : P*i/(1-Math.pow(1+i,-n));
+    const capFijo = P/n;
+    const rows = []; let saldo = P;
+    for(let k=1;k<=n;k++){
+      const int = r2(saldo*i);
+      const cap = (k===n) ? saldo : r2(m==="ins" ? capFijo : pmt-int);
+      const cuota = r2(int+cap);
+      const fin = r2(saldo-cap);
+      rows.push({k, fecha:addMonths(inicio,k), ini:saldo, int, cap, cuota, fin});
+      saldo = fin;
+    }
+    return rows;
+  }
+
+  function calcAmo(){
+    const P = num($("a-monto").value), tasa = num($("a-tasa").value)/100, n = parseInt($("a-plazo").value,10);
+    const ini = parseISO($("a-inicio").value);
+    let msg = "";
+    if(!(P > 0)) msg = "Escriba un monto mayor que cero.";
+    else if(!(tasa >= 0)) msg = "Escriba la tasa anual, por ejemplo 14.";
+    else if(!(n >= 1 && n <= 360)) msg = "El plazo debe estar entre 1 y 360 meses.";
+    else if(!ini) msg = "Elija la fecha de inicio.";
+    $("e-amo").hidden = !msg; $("e-amo").textContent = msg;
+    if(msg){ $("pdf-amo").disabled = true; $("t-body").innerHTML=""; return null; }
+    const rows = schedule(P, tasa, n, ini, modo);
+    const tInt = rows.reduce((s,r)=>s+r.int,0), tCap = rows.reduce((s,r)=>s+r.cap,0), tCuo = rows.reduce((s,r)=>s+r.cuota,0);
+    $("r-cuota-lbl").textContent = modo==="niv" ? "Cuota mensual" : "Primera cuota (luego baja)";
+    $("r-cuota").textContent = L(rows[0].cuota);
+    $("r-tint").textContent = L(tInt); $("r-tpag").textContent = L(tCuo);
+    $("r-ult").textContent = fmtD(rows[rows.length-1].fecha);
+    $("t-body").innerHTML = rows.map(r =>
+      `<tr><td>${r.k}</td><td>${fmtD(r.fecha)}</td><td class="cuota">${nf.format(r.cuota)}</td><td>${nf.format(r.ini)}</td><td>${nf.format(r.int)}</td><td>${nf.format(r.cap)}</td></tr>`).join("");
+    $("f-int").textContent = nf.format(tInt); $("f-cap").textContent = nf.format(tCap); $("f-cuo").textContent = nf.format(tCuo);
+    $("pdf-amo").disabled = false;
+    return {nombre:$("a-nombre").value.trim(), P, tasa, n, ini, modo, rows, tInt, tCap, tCuo};
+  }
+  ["a-monto","a-tasa","a-plazo","a-inicio","a-nombre"].forEach(id => $(id).addEventListener("input", calcAmo));
+
+  // ---------- PDF ----------
+  const NAVY=[31,42,68], YEL=[255,199,44], GRAY=[91,100,122], ROW=[244,245,248];
+  function pdfHeader(doc, title, nombre){
+    const W = doc.internal.pageSize.getWidth();
+    doc.setFillColor(...NAVY); doc.rect(0,0,W,70,"F");
+    doc.setFillColor(...YEL); doc.rect(0,70,W,4,"F");
+    doc.setTextColor(255,255,255); doc.setFont("helvetica","bold"); doc.setFontSize(18);
+    doc.text(title, 40, 42);
+    doc.setFont("helvetica","normal"); doc.setFontSize(9);
+    doc.text("Emitido: " + fmtD(new Date()), W-40, 42, {align:"right"});
+    doc.setTextColor(...NAVY); doc.setFontSize(10); doc.setFont("helvetica","bold");
+    doc.text("Deudor:", 40, 100);
+    doc.setFont("helvetica","normal"); doc.setFontSize(12);
+    doc.text(nombre || "__________________________________", 90, 100);
+    return 120;
+  }
+  function kv(doc, x, y, pairs, colW){
+    pairs.forEach((p,idx) => {
+      const cx = x + (idx%2)*colW, cy = y + Math.floor(idx/2)*34;
+      doc.setFont("helvetica","normal"); doc.setFontSize(8.5); doc.setTextColor(...GRAY); doc.text(p[0], cx, cy);
+      doc.setFont("helvetica","bold"); doc.setFontSize(11); doc.setTextColor(...NAVY); doc.text(p[1], cx, cy+14);
+    });
+    return y + Math.ceil(pairs.length/2)*34;
+  }
+  function footer(doc, note){
+    const W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight(), n = doc.getNumberOfPages();
+    for(let i=1;i<=n;i++){
+      doc.setPage(i); doc.setFont("helvetica","normal"); doc.setFontSize(8); doc.setTextColor(...GRAY);
+      doc.text(note, 40, H-24);
+      doc.text("Página " + i + " de " + n, W-40, H-24, {align:"right"});
+    }
+  }
+  function slug(s){ return (s||"").normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^A-Za-z0-9]+/g,"_").replace(/^_|_$/g,""); }
+
+  function pdfAmo(d){
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({unit:"pt", format:"letter"});
+    const W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight();
+    let y = pdfHeader(doc, "Plan de pagos", d.nombre);
+    y = kv(doc, 40, y+8, [
+      ["Monto del préstamo", L(d.P)], ["Tasa de interés anual", (d.tasa*100).toFixed(2)+"%"],
+      ["Plazo", d.n + (d.n===1?" mes":" meses")], ["Modalidad", d.modo==="niv"?"Cuota nivelada":"Saldos insolutos"],
+      ["Fecha de inicio", fmtD(d.ini)], ["Último pago", fmtD(d.rows[d.rows.length-1].fecha)],
+    ], (W-80)/2);
+    // summary band
+    y += 6;
+    doc.setFillColor(...ROW); doc.roundedRect(40, y, W-80, 46, 6, 6, "F");
+    const sum = [[d.modo==="niv"?"Cuota mensual":"Primera cuota", L(d.rows[0].cuota)],["Total intereses", L(d.tInt)],["Total a pagar", L(d.tCuo)]];
+    sum.forEach((s,i)=>{ const cx = 52 + i*((W-104)/3);
+      doc.setFont("helvetica","normal"); doc.setFontSize(8.5); doc.setTextColor(...GRAY); doc.text(s[0], cx, y+17);
+      doc.setFont("helvetica","bold"); doc.setFontSize(12); doc.setTextColor(...NAVY); doc.text(s[1], cx, y+34); });
+    y += 66;
+    // table
+    const cols = [{h:"No.",w:34,a:"center"},{h:"Fecha de pago",w:84,a:"left"},{h:"Saldo inicial",w:100},{h:"Intereses",w:90},{h:"Capital",w:100},{h:"Cuota a pagar",w:104,b:true}];
+    const tw = cols.reduce((s,c)=>s+c.w,0), x0 = (W-tw)/2, rh = 17;
+    function head(){
+      doc.setFillColor(...NAVY); doc.rect(x0, y, tw, 20, "F");
+      doc.setFont("helvetica","bold"); doc.setFontSize(8.5); doc.setTextColor(255,255,255);
+      let x = x0; cols.forEach(c=>{ const tx = c.a==="center"? x+c.w/2 : c.a==="left"? x+5 : x+c.w-5;
+        doc.text(c.h, tx, y+13.5, {align: c.a||"right"}); x+=c.w; });
+      y += 20;
+    }
+    function rowOut(vals, fill, bold){
+      if(fill){ doc.setFillColor(...fill); doc.rect(x0, y, tw, rh, "F"); }
+      doc.setFont("helvetica", bold?"bold":"normal"); doc.setFontSize(8.5); doc.setTextColor(...NAVY);
+      let x = x0; cols.forEach((c,i)=>{ const v = vals[i]; if(v!==""){ const tx = c.a==="center"? x+c.w/2 : c.a==="left"? x+5 : x+c.w-5;
+        doc.setFont("helvetica", (bold||c.b)?"bold":"normal"); doc.setFontSize(c.b?9.5:8.5);
+        doc.text(String(v), tx, y+12, {align: c.a||"right"}); } x+=c.w; });
+      y += rh;
+    }
+    head();
+    d.rows.forEach((r,idx)=>{
+      if(y + rh > H-50){ doc.addPage(); y = 40; head(); }
+      rowOut([r.k, fmtD(r.fecha), nf.format(r.ini), nf.format(r.int), nf.format(r.cap), nf.format(r.cuota)], idx%2?ROW:null, false);
+    });
+    if(y + rh + 4 > H-50){ doc.addPage(); y = 40; }
+    doc.setDrawColor(...YEL); doc.setLineWidth(1.5); doc.line(x0, y, x0+tw, y);
+    rowOut(["", "Totales", "", nf.format(d.tInt), nf.format(d.tCap), nf.format(d.tCuo)], [255,240,196], true);
+    // signatures
+    y += 50;
+    if(y + 40 > H-50){ doc.addPage(); y = 90; }
+    doc.setDrawColor(...GRAY); doc.setLineWidth(.6);
+    doc.line(60, y, 260, y); doc.line(W-260, y, W-60, y);
+    doc.setFont("helvetica","normal"); doc.setFontSize(9); doc.setTextColor(...GRAY);
+    doc.text("Firma del deudor", 160, y+14, {align:"center"}); doc.text("Firma del acreedor", W-160, y+14, {align:"center"});
+    footer(doc, "Cálculo referencial. Interés mensual = saldo × tasa anual ÷ 12.");
+    return doc.output("blob");
+  }
+
+  function pdfInt(d){
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({unit:"pt", format:"letter"});
+    const W = doc.internal.pageSize.getWidth();
+    let y = pdfHeader(doc, "Cálculo de intereses", d.nombre);
+    y = kv(doc, 40, y+8, [
+      ["Monto", L(d.monto)], ["Tasa de interés anual", (d.tasa*100).toFixed(2)+"%"],
+      ["Fecha inicial", fmtD(d.d1)], ["Fecha final", fmtD(d.d2)],
+      ["Días transcurridos", String(d.dias)], ["Base", "365 días"],
+    ], (W-80)/2);
+    y += 10;
+    doc.setFillColor(...NAVY); doc.roundedRect(40, y, W-80, 92, 8, 8, "F");
+    doc.setFont("helvetica","normal"); doc.setFontSize(9); doc.setTextColor(201,208,224);
+    doc.text("Total de intereses", 58, y+24);
+    doc.setFont("helvetica","bold"); doc.setFontSize(24); doc.setTextColor(...YEL);
+    doc.text(L(d.interes), 58, y+54);
+    doc.setFont("helvetica","normal"); doc.setFontSize(9); doc.setTextColor(255,255,255);
+    doc.text("Interés por día: " + L(d.diario) + "     Monto + intereses: " + L(d.monto + d.interes), 58, y+78);
+    y += 116;
+    doc.setFontSize(9); doc.setTextColor(...GRAY);
+    doc.text("Fórmula: " + L(d.monto) + " × " + (d.tasa*100).toFixed(2) + "% ÷ 365 × " + d.dias + " días", 40, y);
+    footer(doc, "Cálculo referencial. Interés simple, base 365 días.");
+    return doc.output("blob");
+  }
+
+  // Inside Claude the page uses the platform download; anywhere else, a normal browser download.
+  const inClaude = !!(window.claude && typeof window.claude.use === "function");
+  let dlPromise = null;
+  function getDownloads(){
+    if(!dlPromise) dlPromise = inClaude ? window.claude.use("downloads").catch(()=>null) : Promise.resolve(null);
+    return dlPromise;
+  }
+  if(inClaude) setTimeout(getDownloads, 0);
+
+  function browserDownload(blob, filename){
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url), 4000);
+  }
+  // Share sheet (WhatsApp, correo…) only outside Claude, on phones that can share files
+  const canShareFiles = !inClaude && typeof navigator.canShare === "function" && (()=>{
+    try{ return navigator.canShare({files:[new File(["x"],"t.pdf",{type:"application/pdf"})]}); }catch(_){ return false; } })();
+  if(canShareFiles){ $("sh-int").hidden = false; $("sh-amo").hidden = false; }
+
+  function msg(c){
+    return c==="declined" ? "Descarga cancelada." :
+      c==="rate_limited" ? "Ya hay una descarga pendiente. Espere unos segundos e intente de nuevo." :
+      c==="nolib" ? "No se pudo cargar el generador de PDF. Revise su conexión y recargue la página." :
+      "No se pudo generar el PDF. Intente de nuevo.";
+  }
+  async function save(statusEl, btn, filename, makeBlob){
+    statusEl.className = "status"; statusEl.textContent = "Generando el PDF…"; btn.disabled = true;
+    try{
+      if(!window.jspdf) throw {code:"nolib"};
+      const blob = makeBlob();
+      const dl = await getDownloads();
+      if(dl) await dl.save({filename, data: blob});
+      else browserDownload(blob, filename);
+      statusEl.className = "status ok"; statusEl.textContent = "Listo. PDF descargado: " + filename;
+    }catch(e){ statusEl.textContent = msg(e && e.code); }
+    finally{ btn.disabled = false; }
+  }
+  async function share(statusEl, btn, filename, makeBlob, title){
+    statusEl.className = "status"; btn.disabled = true;
+    try{
+      if(!window.jspdf) throw {code:"nolib"};
+      const file = new File([makeBlob()], filename, {type:"application/pdf"});
+      await navigator.share({files:[file], title});
+      statusEl.className = "status ok"; statusEl.textContent = "PDF listo para enviar.";
+    }catch(e){
+      statusEl.textContent = (e && e.name === "AbortError") ? "" : (e && e.code) ? msg(e.code) : "No se pudo abrir el menú para compartir. Use Imprimir PDF y adjunte el archivo.";
+    }finally{ btn.disabled = false; }
+  }
+  const fnAmo = d => "Plan_de_pagos" + (d.nombre? "_"+slug(d.nombre):"") + ".pdf";
+  const fnInt = d => "Calculo_intereses" + (d.nombre? "_"+slug(d.nombre):"") + ".pdf";
+  $("pdf-amo").onclick = () => { const d = calcAmo(); if(d) save($("s-amo"), $("pdf-amo"), fnAmo(d), () => pdfAmo(d)); };
+  $("pdf-int").onclick = () => { const d = calcInt(); if(d) save($("s-int"), $("pdf-int"), fnInt(d), () => pdfInt(d)); };
+  $("sh-amo").onclick = () => { const d = calcAmo(); if(d) share($("s-amo"), $("sh-amo"), fnAmo(d), () => pdfAmo(d), "Plan de pagos"); };
+  $("sh-int").onclick = () => { const d = calcInt(); if(d) share($("s-int"), $("sh-int"), fnInt(d), () => pdfInt(d), "Cálculo de intereses"); };
+
+  window.__test = {calcAmo, calcInt, pdfAmo, pdfInt, setModo};
+  calcInt(); calcAmo();
+})();
+</script>
+</body>
+</html>
